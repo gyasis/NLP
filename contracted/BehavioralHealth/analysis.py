@@ -52,7 +52,8 @@ def similarity_class(sentencesstore,dataframe):
     user_input = input("Enter a sentence: ")
     
     # torch empty cache
-    torch.cuda.empty_cache()
+    # import torch
+    # torch.cuda.empty_cache()
     
 
     sentencesstore.append(user_input)
