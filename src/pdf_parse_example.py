@@ -3,7 +3,7 @@
 import fitz
 
 path = "/media/gyasis/Blade 15 SSD/Users/gyasi/Google Drive (not syncing)/Collection/playground/NLP/documents/informatics-04-00033.pdf"
-
+# %%
 #extract text from pdf
 with fitz.open(path) as doc:
     for page in doc:
