@@ -44,12 +44,12 @@ sorted_data = pd.concat([df1, df2], axis=1)
 sorted_data.head(10)
 # %%
 #open file and seperate each line into a list
+
 def seperate_lines(filename):
     with open(filename, encoding = "ISO-8859-1") as f:
         content = f.readlines()
     content = [x.strip() for x in content]
     return content
-
 # %%
 seperate_lines(sorted_data.English[0])
 # %%

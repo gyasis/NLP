@@ -1,4 +1,6 @@
 # %%
+%load_ext autotime
+# %%
 import docx
 doc = docx.Document("/home/gyasis/Downloads/sich.docx")
 
@@ -89,17 +91,19 @@ def findverbinstring(string):
     doc = nlp(string)
     for token in doc:
         if token.pos_ == "VERB":
-            rootverb = (token.lemma)
+            rootverb = (token.lemma_)
+            print(rootverb)
             try:
-                translation1 = (translation(token.lemma)['translation_text'])
+                translation1 = (translation(token.lemma_)['translation_text'])
             except:
                 translation1 = "error"
             return rootverb, translation1
-            BREAK
+            break
         else:
             rootverb= ("null")
             translation1 = ("null")
-    return rootverb, translation1
+            print(rootverb)
+            return rootverb, translation1
 
 
 # %%
@@ -180,4 +184,148 @@ for element in d:
 
 # %%
 tree = lists2df(list1, list2,"German", "English")
+# %%
+# from the dataframe tree in the clolumn German, if "From" is found delete row
+
+def delete_row(df, column, string):
+    df = df[df[column].str.contains(string) == False]
+    return df
+
+
+# %%
+df = delete_row(tree, "German", "From")
+# %%
+#searh through list and get the first element in each tuple and append to another list
+
+def unique(examplelist):
+    import numpy as np
+    x = np.array(examplelist)
+    x = np.unique(x)
+    return x.tolist()
+    
+
+def grab_verbs(list1):
+    list2 = []
+    
+    for element in list1:
+        try:
+            if element[0] != "null":
+                list2.append(element[0])
+        except:
+            pass
+    #check list2 for duplicates and remove
+    list2 = unique(list2)
+    
+    return list2
+# %%
+listofverbs = grab_verbs(tree['rootverb'])
+# %%
+#process subtitle text file
+
+def ingest_txt(filename):
+    with open(filename) as f:
+        content = f.readlines()
+    content = [x.strip() for x in content]
+    return content
+# %%
+oak = ingest_txt('/home/gyasis/Downloads/Dark0101.srt')
+# %%
+from pysubparser import parser
+
+subtitles = parser.parse('/home/gyasis/Downloads/Dark0101.srt')
+
+for subtitle in subtitles:
+    print(subtitle.text)
+# %%
+import subtitle_parser
+
+with open('/home/gyasis/Downloads/Dark0101.srt', 'r') as input_file:
+    parser = subtitle_parser.SrtParser(input_file)
+    parser.parse()
+    
+parser.print_warnings()
+
+for subtitles in parser.subtitles:
+    print(subtitles.text)
+# %%
+#drop list elements that have part of a string
+oak = [x for x in oak if "-->" not in x]
+# %%
+oak = oak[2:]
+# %%
+oak = [x for x in oak if "" not in x]
+# %%
+for item in oak:
+    print(type(item))
+# %%
+#change elements in list to int with try and except
+willow = []
+for x in oak:
+    try:
+        willow.append(int(x))
+    except:
+        willow.append(x)
+# %%
+#if lenght of element is 0, delete element from list
+
+oak = [x for x in oak if len(x) != 0]
+# %%
+
+# %%
+#loop through elements in list and if element is int creat new list and append every element after int to new list until then next int is found
+
+
+# %%
+def listsoflist(originallist):
+    newlist = []
+    intermediatelist = []
+    for element in originallist:
+        if type(element) == int:
+            try:
+                newlist.append(intermediatelist)
+                intermediatelist = []
+                intermediatelist.append(element)
+            except:
+                print('error')
+                intermediatelist =[]
+                intermediatelist.append(element)
+                
+        else:
+            intermediatelist.append(element)
+    newlist.append(intermediatelist)
+    return newlist
+            
+            
+            
+    
+# %%
+#remove all int from list
+def removeint(list1):
+    newlist = []
+    for element in list1:
+        if type(element) != int:
+            newlist.append(element)
+    return newlist
+# %%
+pine = removeint(willow)
+# %%
+def translatelist(alist):
+    from transformers import AutoModelWithLMHead, AutoTokenizer, AutoModelForCausalLM, pipeline
+
+    model = AutoModelWithLMHead.from_pretrained("facebook/wmt19-de-en")
+    tokenizer = AutoTokenizer.from_pretrained("facebook/wmt19-de-en")
+    translation = pipeline("translation_de_to_en", model=model, tokenizer=tokenizer)
+
+    list1 = []
+    list2 = []
+    for element in alist:
+        
+        list1.append(element)
+        try:
+            list2.append(translation(element)[0]['translation_text'])
+        except:
+            list2.append("null")
+            
+    return lists2df(list1, list2,"German", "English")
+    
 # %%
