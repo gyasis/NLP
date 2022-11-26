@@ -25,7 +25,7 @@ def ingest_pdf(path):
 
 # function to open and read txt file, save to a variable for further processing
 def ingest_txt(filename):
-    Print("Treating this file as a txt")
+    print("Treating this file as a txt")
     with open(filename, encoding = "ISO-8859-1") as f:
         content = f.readlines()
     content = [x.strip() for x in content]
@@ -66,6 +66,10 @@ def ingest_text(type, path):
 # PROCESSING SECTION
 # ACTUAL NLP
 # So far there are two choices to translate DE and IT
+
+def keep_unique(df, column):
+    df = df.drop_duplicates(subset=[column])
+    return df
 
 def lists2df(list1, list2, title1, title2):
     df = pd.DataFrame(zip(list1, list2), columns =[title1, title2])
@@ -157,9 +161,11 @@ def unique(examplelist):
 def trans_todf(templist, languagetotranslate):
     
     #check for duplicates and remove
-    print(f"Number of lines before removing duplicates: {len(templist)}")
-    templist = unique(templist)
-    print(f"Number of lines after removing duplicates: {len(templist)}")
+    # print(f"Number of lines before removing duplicates: {len(templist)}")
+    # templist = unique(templist)
+    # print(f"Number of lines after removing duplicates: {len(templist)}")
+    
+    
     #check for empty strings and and print count and warning if found
     if "" in templist:
         print("Empty string found")
@@ -175,6 +181,12 @@ def trans_todf(templist, languagetotranslate):
     else:
         print("No null values found!")
     
+    print("Checking for duplicates")
+    time.sleep(2)
+    print(f"Number of lines before removing duplicates: {len(tempdf)}")
+    time.sleep(2)
+    tempdf = keep_unique(tempdf, languagetotranslate)
+    print(f"Number of lines after removing duplicates: {len(tempdf)}")
     return tempdf
 
 #EXPORT Section
@@ -184,8 +196,79 @@ def exportcsv(df, filename):
     df.to_csv(filename, index = False, header=True)
 
 
+# Export subsection ---> Create anki deck to export to anki
 
 # %%
+# def create_Model():
+#     import random
+#     import genanki
+    
+#     my_model = genanki.Model(
+#         1926903380,
+#         'Simple Model',
+#         fields = [
+#             {'name' = 'Question'},
+#             {'name' = 'Answer'},
+#         ],
+#         templates = [
+#             {
+#                 'name' = 'Card 1',
+#                 'qfmt' = '{{Question}}',
+#                 'afmt' = '{{FrontSide}}<hr id="answer">{{Answer}}',
+#              },
+#         ])
+    
+#     return my_model
+
+
+def gen_deck(deckname):
+    
+    import random
+    
+    my_deck = genanki.Deck(
+        random.randrange(1 << 30, 1 << 31),
+        deckname)
+    return my_deck
+
+def create_note(model, question, answer):
+    
+    return genanki.Note(
+        model = model,
+        fields = [question, answer]
+    )
+
+def add_note_to_deck(note, deck):
+    deck.add_note(note)
+
+def create_package(path, filename, deck):
+    genanki.Package(deck).write_to_file(f"{path}/{filename}.apkg")
+
+
+# %%
+
+# %%
+my_model = genanki.Model(
+  1607392319,
+  'Simple Model',
+  fields=[
+    {'name': 'Question'},
+    {'name': 'Answer'},
+  ],
+  templates=[
+    {
+      'name': 'Card 1',
+      'qfmt': '{{Question}}',
+      'afmt': '{{FrontSide}}<hr id="answer">{{Answer}}',
+    },
+  ])
+# %%
+
+#add each row to deck
+def get_notes(df,deck,language):
+   
+    for index, row in df.iterrows():
+        deck.addnote(create_note(my_model, row[language], row['English']))
+    
 def translate_(path,language):
     #read file
     import os
@@ -200,21 +283,18 @@ def translate_(path,language):
     import time
     print("Starting translation")
     print("This may take a while")
-    print(path)
     
-    # print(file_)
-    # time.sleep(2)
-    # print(fileext)
-    # time.sleep(2)
-    # print(text)
-    # time.sleep(2)
-    # print(type(text))
-    #translate
+    
     df = trans_todf(text, language)
     
     #export
-    print(f"The path is {path}")
-    print(f"Exporting to {path}/{file_}_{language}.csv")
     
-    exportcsv(df, f"{path}/{filename}_{language}.csv")
-# %%
+    
+    
+    print(f"The path is {path}")
+    my_deck = gen_deck(file_)
+    getnotes(df, my_deck)
+    
+    print(f"Exporting to {path}/{file_}_{language}.apkg")
+    create_package(path, f"{file_}_{language}", my_deck)
+    # exportcsv(df, f"{path}/{filename}_{language}.csv")
