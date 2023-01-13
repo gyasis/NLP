@@ -297,4 +297,3 @@ def translate_(path,language):
     
     print(f"Exporting to {path}/{file_}_{language}.apkg")
     create_package(path, f"{file_}_{language}", my_deck)
-    # exportcsv(df, f"{path}/{filename}_{language}.csv")

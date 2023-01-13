@@ -1,0 +1,81 @@
+# %%
+import pandas as pd
+import datetime
+import sqlite3
+
+def milestone_estimator(goal_date):
+    # Connect to the SQLite database
+    conn = sqlite3.connect("/media/gyasis/Blade 15 SSD/Users/gyasi/Google Drive (not syncing)/Collection/playground/NLP/Language_tools/Apps/test2/test.db")
+    # Retrieve data from the database
+    df = pd.read_sql_query("SELECT * FROM test", conn)
+    df = df.groupby(['Date'])['Hours'].sum().reset_index()
+    # Collect the total amount of hours
+    total_hours = df['Hours'].sum()
+    # Define milestones
+    milestones = {'A1': 200, 'A2': 300, 'B1': 400, 'B2': 750}
+    # Check if there are 7 entries in the dataframe
+    if len(df) < 7:
+        print("Not enough data to estimate completion date")
+    else:
+        # Calculate average weekly hours earned
+        average_weekly_hours = df['Hours'].mean() * 7
+        # Estimate dates of milestone achievement
+        for milestone in milestones:
+            if total_hours < milestones[milestone]:
+                remaining_hours = milestones[milestone] - total_hours
+                weeks_to_go = remaining_hours / average_weekly_hours
+                estimated_date = (datetime.datetime.now() + datetime.timedelta(weeks=weeks_to_go)).date()
+                daily_hours_needed = remaining_hours / (weeks_to_go * 7)
+                weekly_hours_needed = daily_hours_needed * 7
+                print(f"Estimated date of {milestone} achievement: {estimated_date}")
+                print(f"Daily hours needed to reach {milestone}: {daily_hours_needed}")
+                print(f"Weekly hours needed to reach {milestone}: {weekly_hours_needed}")
+                total_hours = milestones[milestone]
+            else:
+                print(f"{milestone} already achieved")
+    # Estimate dates of milestone achievement based on desired goal date
+    goal_date = datetime.datetime.strptime(goal_date, "%Y-%m-%d")
+    for milestone in milestones:
+        if milestones[milestone] > total_hours:
+            remaining_hours = milestones[milestone] - total_hours
+            estimated_date = goal_date - datetime.timedelta(hours=remaining_hours)
+            daily_hours_needed = remaining_hours / (remaining_hours / average_weekly_hours) / 7
+            weekly_hours_needed = daily_hours_needed * 7
+            print(f"Estimated date of {milestone} (based on desired goal date) : {estimated_date.date()}")
+            print(f"Daily hours needed to reach {milestone} (based on desired goal date): {daily_hours_needed}")
+            print(f"Weekly hours needed to reach {milestone} (based on desired goal date): {weekly_hours_needed}")
+            total_hours = milestones[milestone]
+
+
+
+# %%
+import sqlite3
+
+def insert_milestones(db_name):
+    # Connect to the database
+    conn = sqlite3.connect(db_name)
+    c = conn.cursor()
+
+    # Create the milestones table if it doesn't exist
+    c.execute('''CREATE TABLE IF NOT EXISTS milestones (
+                  Milestone TEXT,
+                  Hours INTEGER,
+                  Completion_Date DATE
+                )''')
+
+    # Prompt the user for the B2 completion date
+    b2_date = input("Enter the goal date for B2 completion (YYYY-MM-DD): ")
+
+    # Insert the milestone information into the database
+    c.execute("INSERT INTO milestones (Milestone, Hours) VALUES ('A1', 200), ('A2', 300), ('B1', 400), ('B2', 750)")
+    c.execute("UPDATE milestones SET Completion_Date = ? WHERE Milestone = 'B2'", (b2_date,))
+
+    # Commit the changes and close the connection
+    conn.commit()
+    conn.close()
+
+# %%
+db = "/media/gyasis/Blade 15 SSD/Users/gyasi/Google Drive (not syncing)/Collection/playground/NLP/Language_tools/Apps/test2/test.db"
+# %%
+insert_milestones(db)
+# %%
