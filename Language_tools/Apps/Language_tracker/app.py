@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, redirect
 import sqlite3
 from datetime import datetime
 import plotly.express as px
-from Language_estimator2 import *
+from Language_estimator import *
 from dateutil import parser
 from datetime import timedelta
 from plotly.graph_objs import Bar
@@ -22,13 +22,16 @@ def check_milestones_table():
         c.execute("SELECT * FROM milestones")
         conn.close()
     except:
-        conn.close()
-        # return render_template('setup.html')
-        print("setup database")
+        try:
+            conn.close()
+        except:
+            pass
+        return render_template('setup.html')
 
 
 @app.route('/')
 def home():
+    check_database()
     check_milestones_table()
     return render_template('home.html')
 
@@ -66,8 +69,11 @@ def chart():
     return render_template('chart.html', chart=chart)
 
 
+
 @app.route('/setup', methods=['GET', 'POST'])
+
 def setup():
+    create_db()
     if request.method == 'POST':
         b2_date_text = request.form['b2_date']
         b2_date = datetime.strptime(b2_date_text, '%m/%d/%Y')
@@ -81,6 +87,7 @@ def setup():
         a1_date, a2_date, b1_date, b2_date = calculate_milestone(datetime.now(), hours_per_day, proficiency_levels)
         milestones = [a1_date, a2_date, b1_date, b2_date]
         print(f"milestones: {milestones}")
+        
         # create_milestones()
         update_milestones(a1_date, a2_date, b1_date, b2_date)
         return render_template('setup.html', a1_date=a1_date, a2_date=a2_date, b1_date=b1_date, b2_date=b2_date)
@@ -145,23 +152,7 @@ def pace():
     estimated_date_of_completion = estimated_date_of_completion, last_week_hours = last_week_hours, current_week_hours = current_week_hours,weekly_avg_readable = weekly_avg_readable, hourly_avg_readable = hourly_avg_readable)
 
 
-@app.route('/combined')
-def combined():
-    # code to generate the bar graph and calculate the pace information
-    # ...
-    return render_template('combined.html', graph=bar_graph, suggested_hours_per_week=suggested_hours_per_week, days_until_next_milestone = days_until_next_milestone,days_until_final_milestone=days_until_final_milestone, total_hours = total_hours)
 
 
 if __name__ == '__main__':
-    conn = sqlite3.connect('test.db')
-    cursor = conn.cursor()
-    # try:
-    #     cursor.execute('''CREATE TABLE test (id INTEGER PRIMARY KEY AUTOINCREMENT, hours REAL, date DATE)''')
-    # except sqlite3.OperationalError as e:
-    #     if 'table test already exists' in str(e):
-    #         pass
-    #     else:
-    #         raise
-    conn.commit()
-    conn.close()
     app.run(debug=True)
