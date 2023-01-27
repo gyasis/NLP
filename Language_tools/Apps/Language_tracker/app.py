@@ -87,8 +87,7 @@ def setup():
         a1_date, a2_date, b1_date, b2_date = calculate_milestone(datetime.now(), hours_per_day, proficiency_levels)
         milestones = [a1_date, a2_date, b1_date, b2_date]
         print(f"milestones: {milestones}")
-        
-        # create_milestones()
+        create_milestones(a1_date, a2_date, b1_date, b2_date)
         update_milestones(a1_date, a2_date, b1_date, b2_date)
         return render_template('setup.html', a1_date=a1_date, a2_date=a2_date, b1_date=b1_date, b2_date=b2_date)
     else:
@@ -120,7 +119,7 @@ def pace():
     weekly_avg_readable = timedelta(hours=weekly_avg)
     hourly_avg = total_hours / days_from_first_date
     hourly_avg_readable = timedelta(hours=hourly_avg) 
-    
+
     
 
     #calculate current week and last week hours
