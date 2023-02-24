@@ -1,0 +1,153 @@
+# %%
+import PyPDF2
+import re
+import nltk
+import pytesseract
+from PIL import Image
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForSeq2SeqLM, Trainer, TrainingArguments
+from sklearn.model_selection import train_test_split
+
+# Function to extract text from a PDF file
+def extract_text(filename):
+    with open(filename, 'rb') as file:
+        reader = PyPDF2.PdfReader(file)
+        text = ''
+        for i in range(len(reader.pages)):
+            page = reader.pages[1]
+            text += page.extract_text()
+        return text
+
+# Function to perform OCR on an image file
+def ocr_image(filename):
+    text = pytesseract.image_to_string(Image.open(filename))
+    return text
+
+# Function to clean the text
+def clean_text(text):
+    text = re.sub('\n', ' ', text)  # Replace newlines with spaces
+    text = re.sub('\s+', ' ', text)  # Remove extra spaces
+    text = text.strip()  # Remove leading and trailing spaces
+    return text
+
+# Function to check for redundancy in a list of sentences
+def remove_redundancy(sentences):
+    new_sentences = []
+    for sentence in sentences:
+        if sentence not in new_sentences:
+            new_sentences.append(sentence)
+    return new_sentences
+
+# Load the pre-trained tokenizer and models for question generation and QA
+qg_model_name = 'valhalla/t5-small-qg-hl'
+qa_model_name = 'distilbert-base-cased-distilled-squad'
+qg_tokenizer = AutoTokenizer.from_pretrained(qg_model_name)
+qg_model = AutoModelForSeq2SeqLM.from_pretrained(qg_model_name)
+qa_tokenizer = AutoTokenizer.from_pretrained(qa_model_name)
+qa_model = AutoModelForQuestionAnswering.from_pretrained(qa_model_name)
+
+
+# %%
+# Extract and clean the text from the PDF file
+filename = '/media/gyasis/Blade 15 SSD/Users/gyasi/Google Drive (not syncing)/Collection/playground/NLP/data/GSH_CA_OPT-0297804_Q-105749.1_LA-0000064050_Cerner Sales Order (1).pdf'
+text = extract_text(filename)
+cleaned_text = clean_text(text)
+ 
+# %%
+# Perform OCR on any image files in the PDF document
+image_filenames = re.findall(r'(?<=/Im\d\sDo\s)\S+', text)
+for image_filename in image_filenames:
+    image_text = ocr_image(image_filename)
+    cleaned_image_text = clean_text(image_text)
+    cleaned_text += ' ' + cleaned_image_text
+
+
+# %%
+
+
+# Generate questions for the document using the question generation model
+input_text = cleaned_text  # Use only the first 1000 characters for faster processing
+inputs = qg_tokenizer(input_text, padding=True, truncation=True, return_tensors='pt')
+question_ids = qg_model.generate(inputs['input_ids'], num_beams=8, max_length=20, early_stopping=True)
+generated_questions = [qg_tokenizer.decode(q, skip_special_tokens=True) for q in question_ids]
+
+# Define the size of each chunk
+chunk_size = 1000
+
+# Generate questions on each chunk of the text
+generated_questions = []
+for i in range(0, len(cleaned_text), chunk_size):
+    input_text = cleaned_text[i:i+chunk_size]
+    inputs = qg_tokenizer(input_text, padding=True, truncation=True, return_tensors='pt')
+    question_ids = qg_model.generate(inputs['input_ids'], num_beams=16, max_length=20, early_stopping=True)
+    generated_questions += [qg_tokenizer.decode(q, skip_special_tokens=True) for q in question_ids]
+# %%
+# Function to generate answers from the fine-tuned QA model
+def generate_answer(question, context):
+    inputs = qa_tokenizer.encode_plus(question, context, add_special_tokens=True, return_tensors='pt')
+    input_ids = inputs['input_ids'].tolist()[0]
+    answer_start_scores, answer_end_scores = qa_model(**inputs) 
+    answer_start_scores = torch.tensor(answer_start_scores)
+    print(f'answer_start_scores: {answer_start_scores}')
+    answer_start_scores = answer_start_scores[0]
+   
+    answer_start = torch.argmax(answer_start_scores)
+    answer_end = torch.argmax(answer_end_scores) + 1
+    answer = tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(input_ids[answer_start:answer_end]))
+    return answer
+
+# Pair the generated questions with the corresponding answer from the document to create a training dataset for the QA model
+
+sentences = nltk.sent_tokenize(cleaned_text)
+sentences = remove_redundancy(sentences)  # Remove redundancy
+train_data = []
+for sentence in sentences:
+    for question in generated_questions:
+        answer = generate_answer(question, sentence)
+        if answer:
+            train_data.append({'context': cleaned_text, 'question': question, 'answer': answer})
+
+# Split the training data into training and validation sets
+train_data, val_data = train_test_split(train_data, test_size=0.1, random_state=42)
+
+
+
+
+# Define the training arguments and trainer
+training_args = TrainingArguments(
+    output_dir='./results',          # output directory
+    evaluation_strategy='epoch',     # evaluation strategy to adopt during training
+    save_strategy='epoch',           # checkpoint save strategy
+    learning_rate=2e-5,              # learning rate
+    per_device_train_batch_size=16,  # batch size per device during training
+    per_device_eval_batch_size=64,   # batch size for evaluation
+    num_train_epochs=2,              # number of training epochs
+    weight_decay=0.01,               # strength of weight decay
+    push_to_hub=False,               # push the final model to the Hub
+    logging_dir='./logs',            # directory for storing logs
+    logging_steps=10,
+)
+trainer = Trainer(
+    model=qa_model,                     # the instantiated Hugging Face QA model to be trained
+    args=training_args,                 # training arguments, defined above
+    train_dataset=train_data,           # training dataset
+    eval_dataset=val_data,              # evaluation dataset
+    tokenizer=qa_tokenizer,             # the tokenizer for encoding the training examples
+    data_collator=lambda data: {'input_ids': [x['input_ids'] for x in data], 'attention_mask': [x['attention_mask'] for x in data], 'start_positions': [x['start_positions'] for x in data], 'end_positions': [x['end_positions'] for x in data]},  # function to properly format the inputs for the model
+)
+
+# Fine-tune the QA model on the training data
+trainer.train()
+
+# Evaluate the performance of the model on the validation data
+results = trainer.evaluate()
+print(results)
+
+
+
+# Ask a question and retrieve the corresponding answer from the fine-tuned model
+question = input('Ask a question: ')
+answer = generate_answer(question, cleaned_text)
+print(f"Answer: {answer}")
+
+
+# %%
