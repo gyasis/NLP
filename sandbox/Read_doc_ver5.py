@@ -288,9 +288,6 @@ def translate_(path,language):
     df = trans_todf(text, language)
     
     #export
-    
-    
-    
     print(f"The path is {path}")
     my_deck = gen_deck(file_)
     getnotes(df, my_deck)
